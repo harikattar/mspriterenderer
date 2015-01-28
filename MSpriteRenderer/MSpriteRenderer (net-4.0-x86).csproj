@@ -33,11 +33,15 @@
     <DefineConstants>TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
-    <DocumentationFile>bin\net-4.0-x86\Release\MSpriteRenderer.xml</DocumentationFile>
+    <DocumentationFile>
+    </DocumentationFile>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="Mogre">
-      <HintPath>..\References\mogre\net-4.0-x86\Mogre.dll</HintPath>
+      <HintPath>..\packages\Mogre1.7.4.1.0.6\lib\Mogre.dll</HintPath>
+    </Reference>
+    <Reference Include="MogreNewt">
+      <HintPath>..\packages\Mogre1.7.4.1.0.6\lib\MogreNewt.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
@@ -52,6 +56,7 @@
   <ItemGroup>
     <Compile Include="Source\AnimationCollection.cs" />
     <Compile Include="Source\AnimationInfo.cs" />
+    <Compile Include="Source\TextManager.cs" />
     <Compile Include="Source\RenderTask.cs" />
     <Compile Include="Source\TaskType.cs" />
     <Compile Include="Source\WearableConfig.cs" />
@@ -67,12 +72,7 @@
     <Compile Include="Source\SingleRenderConfig.cs" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\MogreDependencies\MogreDependencies %28net-4.0-x86%29.csproj">
-      <Project>{0AB59862-17A0-4D3F-AE87-E992CB29A629}</Project>
-      <Name>MogreDependencies %28net-4.0-x86%29</Name>
-    </ProjectReference>
-  </ItemGroup>
-  <ItemGroup>
+    <None Include="packages.config" />
     <None Include="plugins.cfg">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
@@ -84,7 +84,16 @@
   <PropertyGroup>
     <PostBuildEvent>xcopy /y /s /e /i /q "$(ProjectDir)Media" "$(ProjectDir)$(OutDir)Media"
 if not exist "$(ProjectDir)$(OutDir)output" (mkdir "$(ProjectDir)$(OutDir)output")
-xcopy /y /s /e /i /q "$(ProjectDir)Configs" "$(ProjectDir)$(OutDir)Configs"</PostBuildEvent>
+xcopy /y /s /e /i /q "$(ProjectDir)Configs" "$(ProjectDir)$(OutDir)Configs"
+if $(ConfigurationName) == Debug (
+    if EXIST "$(SolutionDir)\packages\Mogre1.7.4.1.0.6\tools\Mogre.Dependencies.Debug\Mogre.dll" (
+        copy "$(SolutionDir)\packages\Mogre1.7.4.1.0.6\tools\Mogre.Dependencies.Debug\*" "$(TargetDir))"
+    ) ELSE (
+        copy "$(SolutionDir)\packages\Mogre1.7.4.1.0.6\tools\Mogre.Dependencies.Release\*" "$(TargetDir)"
+    )
+) ELSE (
+    copy "$(SolutionDir)\packages\Mogre1.7.4.1.0.6\tools\Mogre.Dependencies.Release\*" "$(TargetDir)"
+)</PostBuildEvent>
   </PropertyGroup>
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.
