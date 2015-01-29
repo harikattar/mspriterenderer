@@ -7,3 +7,5 @@
 /MSpriteRenderer (net-4.0-x86).suo
 /packages
 /*.zip
+/SSPack/obj
+/SSPack/bin

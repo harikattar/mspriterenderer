@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using System.Xml;
 using System.Xml.Serialization;
 using PixelFormat = Mogre.PixelFormat;
+using sspack;
 
 namespace MSpriteRenderer
 {
@@ -19,9 +20,19 @@ namespace MSpriteRenderer
         private const uint CUSTOM_DIFFUSE = 2;
         private const uint CUSTOM_SPECULAR = 3;
 
+        private const bool REQUIRE_POW2 = false;
+        private const bool REQUIRE_SQUARE = false;
+        private const int PADDING = 0;
+
         private RenderTexture mRTT;
         private Viewport mRTVP;
         private Vector3 _sceneCenter = Vector3.ZERO;
+
+        private IMapExporter mMapExporter;
+        private IImageExporter mImageExporter;
+        private Queue<PackTask> mPackTasks = new Queue<PackTask>();
+        private LimitedConcurrencyLevelTaskScheduler imagePackScheduler;
+        private TaskFactory imagePackTaskFactory;
 
         // Entities
         private Entity _playerEntity;
@@ -52,6 +63,7 @@ namespace MSpriteRenderer
         private AnimationStateIterator mStateIterator;
         private AnimationState mCurrentAnimState;
         private List<string> mRenderedAnims = new List<string>(); //because mogre is a piece of shit 
+        private List<string> mRenderedFrames = new List<string>(); // For SSPack
         private AnimationCollection mAnimationCollection;
         private AnimationInfo mAnimationInfo;
 
@@ -87,6 +99,9 @@ namespace MSpriteRenderer
         {
             ReadConfigs();
             CreateTasks();
+
+            mMapExporter = new GorgonMapExporter() { atlasHeight = 4096, atlasWidth = 4096 };
+            mImageExporter = new PngImageExporter();
 
             var setup = base.Setup();
             var ptr = TextureManager.Singleton.CreateManual("RttTex",
@@ -157,10 +172,10 @@ namespace MSpriteRenderer
             //CompositorManager.Singleton.SetCompositorEnabled(vp, "EdgeDetectCompositor", true);
             //CompositorManager.Singleton.SetCompositorEnabled(rtvp, "EdgeDetectCompositor", true); 
 
-            CompositorManager.Singleton.AddCompositor(vp, "Pixelate", 0);
+            /*CompositorManager.Singleton.AddCompositor(vp, "Pixelate", 0);
             CompositorManager.Singleton.AddCompositor(mRTVP, "Pixelate", 0);
             CompositorManager.Singleton.SetCompositorEnabled(vp, "Pixelate", true);
-            CompositorManager.Singleton.SetCompositorEnabled(mRTVP, "Pixelate", true);
+            CompositorManager.Singleton.SetCompositorEnabled(mRTVP, "Pixelate", true);*/
 
             //CompositorManager.Singleton.AddCompositor(vp, "Normal", 0);
             //CompositorManager.Singleton.AddCompositor(rtvp, "Normal", 0);
@@ -180,6 +195,8 @@ namespace MSpriteRenderer
             //Set up task scheduler
             imageTrimScheduler = new LimitedConcurrencyLevelTaskScheduler(3);
             imageTrimTaskFactory = new TaskFactory(imageTrimScheduler);
+            imagePackScheduler = new LimitedConcurrencyLevelTaskScheduler(1);
+            imagePackTaskFactory = new TaskFactory(imagePackScheduler);
             return setup;
         }
 
@@ -509,13 +526,98 @@ namespace MSpriteRenderer
                 filename = filename + "_" + currentRenderTask.ItemConfig.EntityName;
             else if (currentRenderTask.TaskType == TaskType.Wearable)
                 filename = filename + "_" + currentRenderTask.WearableConfig.EntityName;
-
-            filename = filename + ".xml";
+            string xmlName = filename + ".xml";
 
             var writer = new XmlSerializer(typeof(AnimationCollection));
-            StreamWriter file = new StreamWriter(filename);
+            StreamWriter file = new StreamWriter(xmlName);
             writer.Serialize(file, mAnimationCollection);
             file.Close();
+
+            string packPNG = filename + ".png";
+            string packTAI = filename + ".TAI";
+
+            mPackTasks.Enqueue(new PackTask()
+            {
+                outputFile = packPNG,
+                outputMap = packTAI,
+                inputFiles = new List<string>(mRenderedFrames)
+            });
+            mRenderedFrames.Clear();
+
+            Console.WriteLine("Finished rendering " + filename);
+
+            //imagePackTaskFactory.StartNew(PackEverything,null);
+            PackOnce();
+        }
+        void PackOnce()
+        {
+            if (mPackTasks.Count == 0) return;
+            // generate our output
+            ImagePacker imagePacker = new ImagePacker();
+            Bitmap outputImage;
+            Dictionary<string, System.Drawing.Rectangle> outputMap;
+            PackTask pt = mPackTasks.Dequeue();
+            Console.WriteLine("Packing {0} ({1} left to pack)", pt.outputFile, mPackTasks.Count);
+
+            // pack the image, generating a map only if desired
+            int result = imagePacker.PackImage(pt.inputFiles, REQUIRE_POW2, REQUIRE_SQUARE, 4096, 4096, PADDING, true, out outputImage, out outputMap);
+            if (result != 0)
+            {
+                Console.WriteLine("There was an error making the image sheet.");
+                return;
+            }
+
+            // try to save using our exporters
+            try
+            {
+                if (File.Exists(pt.outputFile))
+                    File.Delete(pt.outputFile);
+                mImageExporter.Save(pt.outputFile, outputImage);
+                Console.WriteLine("Saved atlas {0}.", pt.outputFile);
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine("Error saving file: " + e.Message);
+                return;
+            }
+
+            if (mMapExporter != null)
+            {
+                try
+                {
+                    if (File.Exists(pt.outputMap))
+                        File.Delete(pt.outputMap);
+                    mMapExporter.Save(pt.outputMap, outputMap);
+                    Console.WriteLine("Saved atlas map {0}.", pt.outputMap);
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine("Error saving file: " + e.Message);
+                    return;
+                }
+            }
+            foreach (string filename in pt.inputFiles)
+            {
+                if (File.Exists(filename))
+                {
+                    try
+                    {
+                        File.Delete(filename);
+                    }
+                    catch (IOException)
+                    {
+                        // Welp
+                    }
+                }
+            }
+        }
+        void PackEverything(object arg)
+        {
+            Console.WriteLine("Packing...");
+            while (mPackTasks.Count > 0)
+            {
+                PackOnce();
+            }
         }
 
         protected override void UpdateScene(FrameEvent evt)
@@ -524,11 +626,11 @@ namespace MSpriteRenderer
             //_currentAnimState.AddTime(e.TimeSinceLastFrame);
             if (mWindow.IsClosed)
                 return;
-
             if (currentRenderTask == null && renderTasks.Count > 0)
                 BeginNextTask();
             if (currentRenderTask == null)
             {
+                PackEverything(null);
                 mShutDown = true;
                 return;
             }
@@ -569,7 +671,8 @@ namespace MSpriteRenderer
 
             mRTT.WriteContentsToFile(filename);
 
-            imageTrimTaskFactory.StartNew(TrimSprite, filename);
+            //imageTrimTaskFactory.StartNew(TrimSprite, filename);
+            TrimSprite(filename);
 
             mCameraPosition++;
         }
@@ -662,6 +765,7 @@ namespace MSpriteRenderer
                     var newHeight = bmp.Height - y * 2;
                     WriteBitmap((string)filename,
                                 bmp.Clone(new System.Drawing.Rectangle(newX, newY, newWidth, newHeight), bmp.PixelFormat));
+                    mRenderedFrames.Add(filename);
                 }
             }
         }

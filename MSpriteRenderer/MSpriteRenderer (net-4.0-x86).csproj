@@ -6,7 +6,7 @@
     <ProductVersion>8.0.30703</ProductVersion>
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>{54FCF370-D24B-4166-84C8-1E88074BCE2B}</ProjectGuid>
-    <OutputType>Exe</OutputType>
+    <OutputType>WinExe</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>MSpriteRenderer</RootNamespace>
     <AssemblyName>MSpriteRenderer</AssemblyName>
@@ -36,6 +36,9 @@
     <DocumentationFile>
     </DocumentationFile>
   </PropertyGroup>
+  <PropertyGroup>
+    <StartupObject />
+  </PropertyGroup>
   <ItemGroup>
     <Reference Include="Mogre">
       <HintPath>..\packages\Mogre1.7.4.1.0.6\lib\Mogre.dll</HintPath>
@@ -56,6 +59,8 @@
   <ItemGroup>
     <Compile Include="Source\AnimationCollection.cs" />
     <Compile Include="Source\AnimationInfo.cs" />
+    <Compile Include="Source\GorgonMapExporter.cs" />
+    <Compile Include="Source\PackTask.cs" />
     <Compile Include="Source\TextManager.cs" />
     <Compile Include="Source\RenderTask.cs" />
     <Compile Include="Source\TaskType.cs" />
@@ -79,6 +84,12 @@
     <None Include="resources.cfg">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\SSPack\SSPack.csproj">
+      <Project>{ffa3dba1-bdaa-4234-b0c0-0d0e19b33029}</Project>
+      <Name>SSPack</Name>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
