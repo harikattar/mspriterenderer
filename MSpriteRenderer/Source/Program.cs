@@ -74,11 +74,12 @@ namespace MSpriteRenderer
         /// <param name="azimuth">Angle around the z-axis (from "north")</param>
         /// <param name="altitude">Height angle</param>
         /// <returns></returns>
-        private Vector3 getPosOnSphere(float radius, Degree azimuth, Degree altitude) {
+        private Vector3 getPosOnSphere(float radius, Degree azimuth, Degree altitude)
+        {
             return new Vector3(
-                radius * -Mogre.Math.Cos(azimuth) * Mogre.Math.Sin(altitude),
-                radius *  Mogre.Math.Sin(azimuth) * Mogre.Math.Sin(altitude),
-                radius * -Mogre.Math.Cos(altitude)
+                radius * Mogre.Math.Sin(azimuth) * Mogre.Math.Cos(altitude),  // East
+                radius * (-Mogre.Math.Sin(altitude)), // Zenith
+                radius * (-Mogre.Math.Cos(azimuth)) * Mogre.Math.Cos(altitude)  // North 
             );
         }
 
@@ -104,7 +105,7 @@ namespace MSpriteRenderer
             mRTVP.OverlaysEnabled = false;
 
             //Calculate diagonal distance value
-            mPythDistance = (mDistance / Mogre.Math.Sqrt(2));
+            //mPythDistance = (mDistance / Mogre.Math.Sqrt(2));
 
             var altitude = new Degree(mCameraAngle);
             var angles = new float[]{
@@ -128,12 +129,13 @@ namespace MSpriteRenderer
                 "sw"
             };
             mCameraPositions = new List<Vector3>();
-            for(var i =0;i<8;i++) {
+            for (var i = 0; i < 8; i++)
+            {
                 float azimuth = angles[i];
                 string dirname = mCameraDirections[i];
-                Vector3 pos = getPosOnSphere(mDistance, new Degree(azimuth), altitude);
+                Vector3 pos = getPosOnSphere(mDistance, new Degree(-azimuth), -altitude);
                 mCameraPositions.Add(pos);
-                Console.WriteLine("Determined camera pos: {0,2} is {1,5:F2},{2,5:F2},{3,5:F2}", dirname, pos.x,pos.y,pos.z);
+                Console.WriteLine("Determined camera pos: {0,2} is {1,5:F2},{2,5:F2},{3,5:F2}", dirname, pos.x, pos.y, pos.z);
             }
             /*
             mCameraPositions = new List<Vector3> {
